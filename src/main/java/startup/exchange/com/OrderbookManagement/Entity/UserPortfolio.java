@@ -9,9 +9,10 @@ import lombok.Data;
 
 
 @Data
-@Document(collection = "user_porfolio")
+@Document(collection = "user_portfolio")
 public class UserPortfolio {
 
 	String id;
+	Double total_amount;
 	List<UserOrder> orders;
 }

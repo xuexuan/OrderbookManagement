@@ -1,6 +1,7 @@
 package startup.exchange.com.OrderbookManagement;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -104,17 +105,31 @@ public class Orderbook {
 	{
 		connections.put(userid_, e);
 		Optional<UserPortfolio> portfolio = userRepository.findById(userid_);
+		
+		String userorders;
+		Gson gson = new Gson();
 		if (portfolio.isPresent())
 		{
-			Gson gson = new Gson();
-			String userorders = gson.toJson(portfolio.get().getOrders());
-			try {
-				e.session.getBasicRemote().sendText(userorders);
-			} catch (IOException e1) {
-				_log.error("fail to update {} with orders {}",userid_, userorders);
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
+			userorders = gson.toJson(portfolio.get().getOrders());
+		}
+		else
+		{
+			UserPortfolio userport = new UserPortfolio();
+			userport.setTotal_amount(1000000.0);
+			userport.setId(userid_);
+			userRepository.save(userport);
+			userorders = gson.toJson(userport);
+		}
+		
+		try {
+			//personal account
+			e.session.getBasicRemote().sendText(userorders);
+			//market tick
+			e.session.getBasicRemote().sendText(gson.toJson(matcher.GetTop10Orders()));
+		} catch (IOException e1) {
+			_log.error("fail to update {} with orders {}",userid_, userorders);
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
 	}
 	
@@ -134,12 +149,19 @@ public class Orderbook {
 	//here need to handle multiple thread
 	public Boolean HandleTransistion(Session session_, String userid_, String message_) throws IOException {
 		
+		//save transaction into DB
 		TransactionOrder o = ParseToOrder(message_);
 		o.setId(userid_ + "_" + o.getId()); 
 		transactionRepository.save(o);
 		
+		//start match best orders
 		List<UserOrder> l = matcher.MatchDeal(o);
+		
+		//get matched order infomation,
+		//ready to update back to client
+		//and backup into DB
 		Gson gson = new Gson();
+		List<UserPortfolio> users = new ArrayList<UserPortfolio>();
 		for (UserOrder r: l)
 		{
 			String userid = r.getId().split("_")[0];
@@ -148,10 +170,51 @@ public class Orderbook {
 			{
 				s.session.getBasicRemote().sendText(gson.toJson(r));
 			}
-			//update to DB
 			
+			//replace orders inside MongoDB
+			Optional<UserPortfolio> tmp_user = userRepository.findById(userid);
+			if (tmp_user.isPresent())
+			{
+				Boolean bFound = false;
+				for (UserPortfolio p: users)
+				{
+					if (p.getId() == tmp_user.get().getId())
+					{
+						bFound = true;
+						break;
+					}
+				}
+				if (bFound == false)
+				{
+					users.add(tmp_user.get());	
+				}
+				
+				double total_doneamount = 0;
+				for(UserOrder u: tmp_user.get().getOrders())
+				{
+					if (userid + "_" + u.getId() == r.getId())
+					{
+						u.setDoneamount(r.getDoneamount());
+						u.setPrice(r.getPrice());
+						u.setSide(r.getSide());
+						u.setStatus(r.getStatus());
+						u.setUnixtimestamp(r.getUnixtimestamp());
+						total_doneamount = u.getDoneamount();
+					}
+				}
+				//calculate the rest amount;
+				tmp_user.get().setTotal_amount(tmp_user.get().getTotal_amount() - total_doneamount);
+			}
 		}
+		
 		BroadCast();
+		
+		//can be delay, so can handle inside other thread
+		for (UserPortfolio u: users)
+		{
+			userRepository.save(u);
+		}
+		
 		return true;
 	}
 	
