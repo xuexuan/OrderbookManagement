@@ -18,7 +18,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
-
+//多线程控制弄好一点
+//docker跑起来
 //dispatch userid by IP
 @Component
 @ServerEndpoint(value="/demo/basecoin/{userid}")
@@ -45,17 +46,12 @@ public class ServerEndPoint {
 		userid = userid_;
 		_orderbook = applicationContext.getBean(Orderbook.class);
 		_orderbook.AddConnection(userid_, this);
-		//get list from DB
-		//send list to client
 	}
 	
 	@OnMessage
 	public void onMessage(Session session, String message)  throws IOException, EncodeException{
-		//insert transaction into DB
 		_log.info("user {} request order {}", userid, message);
 		_orderbook.HandleTransistion(session, userid, message);
-		//update deal status into user DB
-		//update userPortfolio in cache.
 	}
 	
 	@OnClose

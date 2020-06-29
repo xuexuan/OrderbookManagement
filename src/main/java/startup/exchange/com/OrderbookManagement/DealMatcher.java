@@ -1,6 +1,7 @@
 package startup.exchange.com.OrderbookManagement;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -24,8 +25,8 @@ import startup.exchange.com.OrderbookManagement.Entity.UserOrder;
 public class DealMatcher {
 	Logger _log = LoggerFactory.getLogger(Orderbook.class);
 	
-	List<TransactionOrder> buylist;
-	List<TransactionOrder> selllist;
+	List<TransactionOrder> buylist = new ArrayList<TransactionOrder>();
+	List<TransactionOrder> selllist = new ArrayList<TransactionOrder>();
 	
 	
 	public synchronized List<UserOrder> MatchDeal(TransactionOrder o_) {
@@ -84,19 +85,22 @@ public class DealMatcher {
 		});
 		
 		List<UserOrder> updateList = new ArrayList<UserOrder>();
-		for (TransactionOrder b: buylist)
+		for (final Iterator<TransactionOrder> buyIter = buylist.iterator(); buyIter.hasNext(); )
 		{
-			if (b.getPrice() < selllist.get(0).getPrice())
+			TransactionOrder b = buyIter.next();
+			if (selllist.isEmpty() ||b.getPrice() < selllist.get(0).getPrice())
 				break;
 			
-			for (TransactionOrder s: selllist)
+			
+			for (final Iterator<TransactionOrder> sellIter = selllist.iterator(); sellIter.hasNext();)
 			{
+				TransactionOrder s = sellIter.next();
 				int tmp_amount = (int) b.getAmount();
 				if (s.getPrice() <= b.getPrice() && tmp_amount != 0)
 				{
 					if (s.getAmount() <= tmp_amount)
 					{
-						selllist.remove(s);
+						sellIter.remove();
 						UserOrder neworder = new UserOrder();
 						neworder.CopyFromTransaction(s);
 						neworder.setStatus("done");
@@ -118,7 +122,7 @@ public class DealMatcher {
 					
 					if (tmp_amount == 0)
 					{
-						buylist.remove(b);
+						buyIter.remove();
 						UserOrder neworder = new UserOrder();
 						neworder.CopyFromTransaction(b);
 						neworder.setDoneamount(b.getAmount());

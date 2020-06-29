@@ -135,8 +135,8 @@ public class Orderbook {
 	public Boolean HandleTransistion(Session session_, String userid_, String message_) throws IOException {
 		
 		TransactionOrder o = ParseToOrder(message_);
-		transactionRepository.save(o);
 		o.setId(userid_ + "_" + o.getId()); 
+		transactionRepository.save(o);
 		
 		List<UserOrder> l = matcher.MatchDeal(o);
 		Gson gson = new Gson();

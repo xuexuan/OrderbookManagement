@@ -9,7 +9,7 @@ import lombok.Data;
 
 
 @Data
-@Document(collection = "userporfolio")
+@Document(collection = "user_porfolio")
 public class UserPortfolio {
 
 	String id;

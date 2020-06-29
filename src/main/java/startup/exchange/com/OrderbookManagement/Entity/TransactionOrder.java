@@ -7,7 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.Data;
 
 @Data
-@Document(collection = "transaction")
+@Document(collection = "transaction_orders")
 public class TransactionOrder {
 
 	public TransactionOrder()
