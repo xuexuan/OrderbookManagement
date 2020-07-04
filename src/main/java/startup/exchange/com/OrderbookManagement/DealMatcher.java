@@ -7,6 +7,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.gson.Gson;
+
 import startup.exchange.com.OrderbookManagement.Entity.TransactionOrder;
 import startup.exchange.com.OrderbookManagement.Entity.UserOrder;
 
@@ -27,10 +29,11 @@ public class DealMatcher {
 	
 	List<TransactionOrder> buylist = new ArrayList<TransactionOrder>();
 	List<TransactionOrder> selllist = new ArrayList<TransactionOrder>();
-	
+	Double price = 0.0;
 	
 	public synchronized List<UserOrder> MatchDeal(TransactionOrder o_) {
 		
+		List<UserOrder> updateList = new ArrayList<UserOrder>();
 		if (o_.getStatus().contentEquals("cancel"))
 		{
 			o_.setStatus("cancel");
@@ -51,6 +54,11 @@ public class DealMatcher {
 					break;
 				}
 			}
+			
+			UserOrder o = new UserOrder();
+			o.CopyFromTransaction(o_);
+			updateList.add(o);
+			return updateList;
 		}
 		
 		o_.setStatus("pending");
@@ -84,13 +92,14 @@ public class DealMatcher {
 			}
 		});
 		
-		List<UserOrder> updateList = new ArrayList<UserOrder>();
+		if (buylist.isEmpty() || selllist.isEmpty())
+		{
+			return updateList;
+		}
+		//handle non-pending, new add order
 		for (final Iterator<TransactionOrder> buyIter = buylist.iterator(); buyIter.hasNext(); )
 		{
 			TransactionOrder b = buyIter.next();
-			if (selllist.isEmpty() ||b.getPrice() < selllist.get(0).getPrice())
-				break;
-			
 			
 			for (final Iterator<TransactionOrder> sellIter = selllist.iterator(); sellIter.hasNext();)
 			{
@@ -98,6 +107,7 @@ public class DealMatcher {
 				int tmp_amount = (int) b.getAmount();
 				if (s.getPrice() <= b.getPrice() && tmp_amount != 0)
 				{
+					price = b.getPrice();
 					if (s.getAmount() <= tmp_amount)
 					{
 						sellIter.remove();
@@ -115,9 +125,11 @@ public class DealMatcher {
 						neworder.CopyFromTransaction(s);
 						neworder.setDoneamount(tmp_amount);
 						neworder.setPendingamount(s.getAmount() - tmp_amount);
+						s.setAmount(s.getAmount() - tmp_amount);
 						neworder.setStatus("partial");
 						updateList.add(neworder);
 						tmp_amount = 0;
+						
 					}
 					
 					if (tmp_amount == 0)
@@ -138,10 +150,14 @@ public class DealMatcher {
 						neworder.setPendingamount(tmp_amount);
 						neworder.setStatus("partial");
 						updateList.add(neworder);
+						b.setAmount(b.getAmount() - tmp_amount);
 					}
 				}
 			}
 		}
+		
+		Gson gson = new Gson();
+		_log.info(gson.toJson(updateList));
 		
 		return updateList;
 	}
@@ -159,5 +175,10 @@ public class DealMatcher {
 			total.add(o);
 		}
 		return total;
+	}
+	
+	public synchronized Double GetCurrentPrice()
+	{
+		return price;
 	}
 }

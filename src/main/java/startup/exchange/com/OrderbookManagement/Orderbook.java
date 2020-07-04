@@ -1,9 +1,7 @@
 package startup.exchange.com.OrderbookManagement;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.websocket.Session;
@@ -54,76 +52,29 @@ public class Orderbook {
 	Logger _log = LoggerFactory.getLogger(Orderbook.class);
 	
 	ConcurrentHashMap<String, ServerEndPoint> connections;
-	//CopyOnWriteArraySet<String> tickImage;
-	//CopyOnWriteArraySet<Map.Entry<Session, String>> userDealStatus;
 	DealMatcher matcher;
-	//Thread dispatchWorker;
+	//can be handle in other thread
+	AccountPortfolio accPort;
 	
-	private final OrderbookManagementRepository userRepository;
 	private final TansactionRepository transactionRepository;
 	
 	public Orderbook(final OrderbookManagementRepository user_, final TansactionRepository trancsaction_)
 	{
-		userRepository = user_;
 		transactionRepository  = trancsaction_;
+		accPort = new AccountPortfolio(user_);
 		connections = new ConcurrentHashMap<String, ServerEndPoint>();
 		matcher = new DealMatcher();
-//		Runnable t = () -> {
-//			if (!pendingItems.isEmpty())
-//			{
-//				for (Map.Entry<String, Object> item: pendingItems)
-//				{
-//					if (item.getKey().contentEquals("broadcast"))
-//					{
-//						for(ServerEndPoint s: connections)
-//						{
-//							//s.session send message
-//						}
-//					}
-//					else if (item.getKey().contains("userportfilio"))
-//					{
-//						Map.Entry<Session, String> value = (Map.Entry<Session, String>)item.getValue();
-//						//value.session send message
-//					}
-//				}
-//				pendingItems.clear();
-//			}
-//			
-//			try {
-//				while(pendingItems.isEmpty())
-//					Thread.currentThread().wait();
-//			} catch (InterruptedException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-//		};
-//		dispatchWorker = new Thread(t);
-//		dispatchWorker.start();
 	}
 	
 	public void AddConnection(String userid_, ServerEndPoint e) 
 	{
 		connections.put(userid_, e);
-		Optional<UserPortfolio> portfolio = userRepository.findById(userid_);
-		
-		String userorders;
-		Gson gson = new Gson();
-		if (portfolio.isPresent())
-		{
-			userorders = gson.toJson(portfolio.get().getOrders());
-		}
-		else
-		{
-			UserPortfolio userport = new UserPortfolio();
-			userport.setTotal_amount(1000000.0);
-			userport.setId(userid_);
-			userRepository.save(userport);
-			userorders = gson.toJson(userport);
-		}
+		String userorders = accPort.GetInitialPortfolio(userid_);
 		
 		try {
 			//personal account
 			e.session.getBasicRemote().sendText(userorders);
+			Gson gson = new Gson();
 			//market tick
 			e.session.getBasicRemote().sendText(gson.toJson(matcher.GetTop10Orders()));
 		} catch (IOException e1) {
@@ -156,65 +107,22 @@ public class Orderbook {
 		
 		//start match best orders
 		List<UserOrder> l = matcher.MatchDeal(o);
-		
-		//get matched order infomation,
-		//ready to update back to client
-		//and backup into DB
-		Gson gson = new Gson();
-		List<UserPortfolio> users = new ArrayList<UserPortfolio>();
-		for (UserOrder r: l)
-		{
-			String userid = r.getId().split("_")[0];
-			ServerEndPoint s = connections.get(userid);
-			if (s.session.isOpen())
-			{
-				s.session.getBasicRemote().sendText(gson.toJson(r));
-			}
-			
-			//replace orders inside MongoDB
-			Optional<UserPortfolio> tmp_user = userRepository.findById(userid);
-			if (tmp_user.isPresent())
-			{
-				Boolean bFound = false;
-				for (UserPortfolio p: users)
-				{
-					if (p.getId() == tmp_user.get().getId())
-					{
-						bFound = true;
-						break;
-					}
-				}
-				if (bFound == false)
-				{
-					users.add(tmp_user.get());	
-				}
-				
-				double total_doneamount = 0;
-				for(UserOrder u: tmp_user.get().getOrders())
-				{
-					if (userid + "_" + u.getId() == r.getId())
-					{
-						u.setDoneamount(r.getDoneamount());
-						u.setPrice(r.getPrice());
-						u.setSide(r.getSide());
-						u.setStatus(r.getStatus());
-						u.setUnixtimestamp(r.getUnixtimestamp());
-						total_doneamount = u.getDoneamount();
-					}
-				}
-				//calculate the rest amount;
-				tmp_user.get().setTotal_amount(tmp_user.get().getTotal_amount() - total_doneamount);
-			}
-		}
-		
+		//update tick orders and final price
 		BroadCast();
 		
-		//can be delay, so can handle inside other thread
-		for (UserPortfolio u: users)
+		//async call
+		UserOrder neworder = new UserOrder();
+		neworder.CopyFromTransaction(o);
+		List<UserPortfolio> updatedUser = accPort.UpdatePortfolio(neworder, l);
+		Gson gson = new Gson();
+		for(UserPortfolio u: updatedUser)
 		{
-			userRepository.save(u);
+			ServerEndPoint s = connections.get(u.getId().split("_")[0]);
+			if (s.session.isOpen())
+			{
+				s.session.getBasicRemote().sendText(gson.toJson(u));
+			}
 		}
-		
 		return true;
 	}
 	
@@ -227,12 +135,14 @@ public class Orderbook {
 	{
 		synchronized(this) {
 			List<TransactionOrder> orders = matcher.GetTop10Orders();
+			Double price = matcher.GetCurrentPrice();
 			Gson gson = new Gson();
 			for(ServerEndPoint s : connections.values())
 			{
 				if (s.session.isOpen())
 				{
 					s.session.getBasicRemote().sendText(gson.toJson(orders));
+					s.session.getBasicRemote().sendText(gson.toJson(price));
 				}
 			}
 		}
