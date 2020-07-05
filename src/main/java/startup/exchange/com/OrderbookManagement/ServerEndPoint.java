@@ -50,7 +50,7 @@ public class ServerEndPoint {
 	
 	@OnMessage
 	public void onMessage(Session session, String message)  throws IOException, EncodeException{
-		_log.info("user {} request order {}", userid, message);
+		_log.info("user {} request order {} in thread_{}", userid, message, Thread.currentThread().getId());
 		_orderbook.HandleTransistion(session, userid, message);
 	}
 	

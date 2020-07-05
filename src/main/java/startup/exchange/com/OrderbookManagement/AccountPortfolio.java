@@ -116,7 +116,6 @@ public class AccountPortfolio {
 					Boolean bMatch = false;
 					for(UserOrder u: currentuser.getOrders())
 					{
-						_log.info("{},{},{}",userid, u.getId(),r.getId());
 						if (u.getId().contentEquals(r.getId()))
 						{
 							u.setPendingamount(r.getPendingamount());
