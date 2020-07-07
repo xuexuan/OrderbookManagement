@@ -78,7 +78,7 @@ public class Orderbook {
 			//market tick
 			e.session.getBasicRemote().sendText(gson.toJson(matcher.GetTop10Orders()));
 		} catch (IOException e1) {
-			_log.error("fail to update {} with orders {}",userid_, userorders);
+			//_log.error("fail to update {} with orders {}",userid_, userorders);
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
@@ -105,8 +105,10 @@ public class Orderbook {
 		o.setId(userid_ + "_" + o.getId()); 
 		transactionRepository.save(o);
 		
+		_log.info("Insert: " +message_);
 		//start match best orders
 		List<UserOrder> l = matcher.MatchDeal(o);
+		
 		//update tick orders and final price
 		BroadCast();
 		
@@ -118,9 +120,12 @@ public class Orderbook {
 		for(UserPortfolio u: updatedUser)
 		{
 			ServerEndPoint s = connections.get(u.getId().split("_")[0]);
-			if (s.session.isOpen())
+			synchronized(s.session)
 			{
-				s.session.getBasicRemote().sendText(gson.toJson(u));
+				if (s.session.isOpen())
+				{
+					s.session.getBasicRemote().sendText(gson.toJson(u));
+				}	
 			}
 		}
 		return true;
@@ -136,13 +141,17 @@ public class Orderbook {
 		synchronized(this) {
 			List<TransactionOrder> orders = matcher.GetTop10Orders();
 			Double price = matcher.GetCurrentPrice();
+			_log.info("Current price: "+ price);
 			Gson gson = new Gson();
 			for(ServerEndPoint s : connections.values())
 			{
-				if (s.session.isOpen())
+				synchronized(s.session)
 				{
-					s.session.getBasicRemote().sendText(gson.toJson(orders));
-					s.session.getBasicRemote().sendText(gson.toJson(price));
+					if (s.session.isOpen())
+					{
+						s.session.getBasicRemote().sendText(gson.toJson(orders));
+						s.session.getBasicRemote().sendText(gson.toJson(price));
+					}	
 				}
 			}
 		}

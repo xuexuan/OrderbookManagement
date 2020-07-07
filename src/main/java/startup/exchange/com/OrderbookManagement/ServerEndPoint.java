@@ -30,6 +30,7 @@ public class ServerEndPoint {
 	Session session;
 	String userid;
 	List<String> userPortfolio = new ArrayList<String>();
+	
 	private static ApplicationContext applicationContext;
 	
 	public static void SetApplicationContext(ApplicationContext context_)
@@ -41,7 +42,7 @@ public class ServerEndPoint {
 	
 	@OnOpen
 	public void onOpen(@PathParam("userid") String userid_, Session session_) throws IOException{
-		_log.info("user {} request connection", userid_);
+		_log.info("-------"+userid_ +" Thread: "+Thread.currentThread().getId());
 		session = session_;
 		userid = userid_;
 		_orderbook = applicationContext.getBean(Orderbook.class);
@@ -64,6 +65,8 @@ public class ServerEndPoint {
     public void onError(Session session, Throwable throwable) {
         // Do error handling here
 		try {
+			_log.info("Connection error: "+ throwable);
+			throwable.printStackTrace();
 			onClose(session);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

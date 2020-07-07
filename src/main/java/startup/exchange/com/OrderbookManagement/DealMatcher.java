@@ -141,6 +141,7 @@ public class DealMatcher {
 						neworder.setPendingamount(0);
 						neworder.setStatus("done");
 						updateList.add(neworder);
+						break;
 					}
 					else
 					{
