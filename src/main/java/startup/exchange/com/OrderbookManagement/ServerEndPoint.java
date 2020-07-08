@@ -45,7 +45,13 @@ public class ServerEndPoint {
 		_log.info("-------"+userid_ +" Thread: "+Thread.currentThread().getId());
 		session = session_;
 		userid = userid_;
-		_orderbook = applicationContext.getBean(Orderbook.class);
+		synchronized(applicationContext)
+		{
+			if (_orderbook == null)
+			{
+				_orderbook = applicationContext.getBean(Orderbook.class);
+			}
+		}
 		_orderbook.AddConnection(userid_, this);
 	}
 	
