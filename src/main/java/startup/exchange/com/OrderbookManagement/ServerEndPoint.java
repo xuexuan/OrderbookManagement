@@ -30,6 +30,7 @@ public class ServerEndPoint {
 	Session session;
 	String userid;
 	List<String> userPortfolio = new ArrayList<String>();
+	//ack receive and ack send
 	
 	private static ApplicationContext applicationContext;
 	
