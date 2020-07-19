@@ -124,7 +124,7 @@ public class Orderbook {
 			{
 				if (s.session.isOpen())
 				{
-					s.session.getBasicRemote().sendText(gson.toJson(u));
+					s.session.getBasicRemote().sendText(gson.toJson(u.getOrders()));
 				}	
 			}
 		}
@@ -145,13 +145,11 @@ public class Orderbook {
 			Gson gson = new Gson();
 			for(ServerEndPoint s : connections.values())
 			{
-				synchronized(s.session)
+				if (s.session.isOpen())
 				{
-					if (s.session.isOpen())
-					{
-						s.session.getBasicRemote().sendText(gson.toJson(orders));
-						s.session.getBasicRemote().sendText(gson.toJson(price));
-					}	
+					_log.info("broadcase users: "+s.userid);
+					s.session.getBasicRemote().sendText(gson.toJson(orders));
+					s.session.getBasicRemote().sendText(gson.toJson(price));
 				}
 			}
 		}
