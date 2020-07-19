@@ -15,14 +15,14 @@ import javax.websocket.server.ServerEndpoint;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 //多线程控制弄好一点
 //docker跑起来
 //dispatch userid by IP
 @Component
-@ServerEndpoint(value="/demo/basecoin/{userid}")
+@ServerEndpoint(value="/demo/basecoin/{userid}", configurator=SocketServerConfiguration.class)
 public class ServerEndPoint {
 
 	Logger _log = LoggerFactory.getLogger(ServerEndPoint.class);
@@ -32,13 +32,14 @@ public class ServerEndPoint {
 	List<String> userPortfolio = new ArrayList<String>();
 	//ack receive and ack send
 	
-	private static ApplicationContext applicationContext;
+	//private static ApplicationContext applicationContext;
 	
-	public static void SetApplicationContext(ApplicationContext context_)
-	{
-		ServerEndPoint.applicationContext = context_;
-	}
+//	public static void SetApplicationContext(ApplicationContext context_)
+//	{
+//		ServerEndPoint.applicationContext = context_;
+//	}
 	
+	@Autowired
 	private Orderbook _orderbook;
 	
 	@OnOpen
@@ -46,14 +47,15 @@ public class ServerEndPoint {
 		_log.info("-------"+userid_ +" Thread: "+Thread.currentThread().getId());
 		session = session_;
 		userid = userid_;
-		synchronized(applicationContext)
-		{
-			if (_orderbook == null)
-			{
-				_orderbook = applicationContext.getBean(Orderbook.class);
-			}
-		}
-		_orderbook.AddConnection(userid_, this);
+//		synchronized(applicationContext)
+//		{
+//			if (_orderbook == null)
+//			{
+//				_orderbook = applicationContext.getBean(Orderbook.class);
+//			}
+//		}
+		if(_orderbook != null)
+			_orderbook.AddConnection(userid_, this);
 	}
 	
 	@OnMessage
